@@ -22,7 +22,7 @@
 ```bash
 pip install -r requirements.txt
 ```
-или
+или запусти файл (только для Windows)
 
 ```bash
 install.bat
@@ -35,7 +35,7 @@ install.bat
 ```bash
 python main.py
 ```
-или
+или запусти файл (только для Windows)
 
 ```bash
 start.bat
