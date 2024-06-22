@@ -20,13 +20,11 @@ protocols = [
     'scrl_lineabank'
 ]
 
-
 # Функция чтения прокси из файла
 def read_proxies():
     with open('proxies.txt', 'r') as f:
         proxies = [line.strip() for line in f]
     return proxies
-
 
 # Функция получения случайного прокси
 def get_random_proxy(proxies):
@@ -40,32 +38,48 @@ def get_random_proxy(proxies):
         'https': f'socks5://{user}:{password}@{ip}:{port}'
     }
 
-
 # Функция для запроса данных и извлечения asset_usd_value
 def fetch_protocol_value(wallet_address, protocol, proxies, user_agent):
-    retry_delay = 180  # задержка в секундах (3 минуты)
-    for _ in range(len(proxies)):
-        proxy = get_random_proxy(proxies)
-        url = f'https://api.rabby.io/v1/user/protocol?id={wallet_address}&protocol_id={protocol}'
-        headers = {'User-Agent': user_agent.random}
-        try:
-            response = requests.get(url, proxies=proxy, headers=headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                asset_usd_value = sum(
-                    item.get('stats', {}).get('asset_usd_value', 0) for item in data.get('portfolio_item_list', []))
-                return asset_usd_value
-            elif response.status_code == 429:
-                print(f"Лимит запросов достигнут для {url}, ожидание {retry_delay // 60} минут")
-                time.sleep(retry_delay)
-                continue
-            else:
-                print(f"Неверный статус код {response.status_code} для {url}")  # Логирование статуса
-        except requests.exceptions.RequestException as e:
-            print(f"Ошибка при запросе {url}: {e}")
-            continue
-    return 0
+    initial_delay = 60  # начальная задержка в секундах (1 минута)
+    max_retries = 5  # Максимальное количество повторных попыток для каждого прокси
+    timeout = 60  # Увеличение тайм-аута
 
+    for attempt in range(max_retries):
+        for proxy in proxies:
+            proxy_dict = get_random_proxy(proxies)
+            session = requests.Session()
+            session.proxies = proxy_dict
+            session.headers.update({
+                'Content-Type': 'application/json',
+                'User-Agent': user_agent.random,
+                'X-Api-Nonce': 'n_Uz9GOGNykdwsIqsAymH1D5mwTQuAmS2RQAdVxtzP',
+                'X-Api-Sign': '2332b2a8ae108538b05d429f2185e7ca892e421ea1dbdb848ed7a5413073e1f8',
+                'X-Api-Ver': 'v2',
+                'X-Client': 'Rabby',
+                'X-Version': '0.92.76'
+            })
+
+            url = f'https://api.rabby.io/v1/user/protocol?id={wallet_address}&protocol_id={protocol}'
+            try:
+                response = session.get(url, timeout=timeout)
+                if response.status_code == 200:
+                    data = response.json()
+                    asset_usd_value = sum(
+                        item.get('stats', {}).get('asset_usd_value', 0) for item in data.get('portfolio_item_list', []))
+                    return asset_usd_value
+                elif response.status_code == 429:
+                    print(f"Лимит запросов достигнут для {wallet_address} с прокси {proxy_dict['http']}")
+                    time.sleep(initial_delay * (attempt + 1))  # Увеличение задержки для каждой попытки
+                    continue
+                else:
+                    print(f"Неверный статус код {response.status_code} для {url}")
+            except requests.exceptions.RequestException as e:
+                print(f"Ошибка при запросе {wallet_address} через прокси {proxy_dict['http']}: {e}")
+                continue
+
+        print(f"Все прокси достигли лимита запросов или неудачны. Ожидание {initial_delay // 60} минут.")
+        time.sleep(initial_delay * (attempt + 1))  # Увеличение задержки для каждой попытки
+    return 0
 
 # Функция для обработки кошелька
 def process_wallet(index, wallet_address, proxies, user_agent):
@@ -79,7 +93,6 @@ def process_wallet(index, wallet_address, proxies, user_agent):
 
     wallet_result['total_liquidity'] = total_value
     return wallet_result
-
 
 # Чтение адресов кошельков из файла wallets.txt
 with open('wallets.txt', 'r') as file:
@@ -96,9 +109,8 @@ user_agent = UserAgent()
 
 # Использование ThreadPoolExecutor для многопоточности
 results = [None] * len(wallet_addresses)
-with ThreadPoolExecutor(max_workers=2) as executor:
-    futures = {executor.submit(process_wallet, index, wallet_address, proxies, user_agent): index for
-               index, wallet_address in
+with ThreadPoolExecutor(max_workers=5) as executor:
+    futures = {executor.submit(process_wallet, index, wallet_address, proxies, user_agent): index for index, wallet_address in
                enumerate(wallet_addresses)}
     for future in tqdm(as_completed(futures), total=len(wallet_addresses), desc="Обработка кошельков"):
         index = futures[future]
