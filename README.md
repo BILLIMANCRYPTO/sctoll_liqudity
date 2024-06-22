@@ -21,3 +21,21 @@
 
 ```bash
 pip install -r requirements.txt
+
+или
+
+```bash
+install.bat
+
+
+## Запуск скрипта
+
+Для запуска скрипта выполните команду:
+
+```bash
+python main.py
+
+или
+
+```bash
+start.bat
