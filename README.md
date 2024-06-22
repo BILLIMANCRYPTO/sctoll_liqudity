@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 ```bash
 install.bat
-
+```
 
 ## Установка зависимостей
 
@@ -34,8 +34,9 @@ install.bat
 
 ```bash
 python main.py
-
+```
 или
 
 ```bash
 start.bat
+```
